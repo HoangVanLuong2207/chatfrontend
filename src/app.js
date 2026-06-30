@@ -20,6 +20,13 @@ let conversationId = null;
 let pusherClient = null;
 let selectedFile = null;
 
+// Notification state
+const ORIGINAL_TITLE = document.title;
+let titleFlashInterval = null;
+let isTabFocused = true;
+let unreadCount = 0;
+let notificationPermission = Notification?.permission || 'denied';
+
 // ═══════════════════════════════════════════
 // DOM Elements
 // ═══════════════════════════════════════════
@@ -46,6 +53,10 @@ const lightbox = document.getElementById('lightbox');
 const lightboxImg = document.getElementById('lightbox-img');
 const typingIndicator = document.getElementById('typing-indicator');
 const toastContainer = document.getElementById('toast-container');
+const notifPermissionBar = document.getElementById('notif-permission-bar');
+const notifAllowBtn = document.getElementById('notif-allow-btn');
+const notifDismissBtn = document.getElementById('notif-dismiss-btn');
+const unreadBadge = document.getElementById('unread-badge');
 
 // ═══════════════════════════════════════════
 // Initialization
@@ -54,6 +65,25 @@ const toastContainer = document.getElementById('toast-container');
 async function init() {
   const token = getToken();
   const user = getUser();
+
+  // Track tab focus for notification decisions
+  document.addEventListener('visibilitychange', () => {
+    isTabFocused = !document.hidden;
+    if (isTabFocused) {
+      unreadCount = 0;
+      updateUnreadBadge();
+      stopTitleFlash();
+    }
+  });
+  window.addEventListener('focus', () => {
+    isTabFocused = true;
+    unreadCount = 0;
+    updateUnreadBadge();
+    stopTitleFlash();
+  });
+  window.addEventListener('blur', () => {
+    isTabFocused = false;
+  });
 
   if (token && user) {
     currentUser = user;
@@ -119,6 +149,9 @@ async function enterChat() {
 
     // Setup Pusher
     await setupPusher();
+
+    // Ask for notification permission
+    checkNotificationPermission();
   } catch (err) {
     showToast('Lỗi kết nối: ' + err.message, 'error');
   }
@@ -169,9 +202,36 @@ async function setupPusher() {
     channel.bind('new-message', (data) => {
       // Don't duplicate own messages
       if (data.sender_id === currentUser.id) return;
+
       appendMessage(data);
       scrollToBottom();
       playNotificationSound();
+
+      // Notification logic — notify when admin replies
+      const senderName = data.sender_name || 'Hỗ trợ';
+      const avatarSrc = data.sender_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${senderName}`;
+      const msgPreview = data.type === 'image' ? '🖼️ Đã gửi một ảnh' : (data.content || '');
+
+      if (!isTabFocused) {
+        unreadCount++;
+        updateUnreadBadge();
+        startTitleFlash();
+
+        // Rich toast
+        showRichToast({
+          title: senderName,
+          body: msgPreview,
+          avatar: avatarSrc,
+          type: 'message',
+        });
+
+        // Browser notification
+        sendBrowserNotification(`${senderName} — ChatBox`, {
+          body: msgPreview,
+          icon: avatarSrc,
+          tag: `chatbox-reply-${conversationId}`,
+        });
+      }
     });
 
     channel.bind('conversation-closed', () => {
@@ -405,6 +465,135 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+/**
+ * Rich toast with avatar, name, message preview
+ */
+function showRichToast({ title, body, avatar, type = 'info' }) {
+  const toast = document.createElement('div');
+  toast.className = `toast rich-toast ${type}`;
+
+  const truncatedBody = body && body.length > 60 ? body.substring(0, 60) + '…' : body;
+
+  toast.innerHTML = `
+    <div class="rich-toast-content">
+      <img class="rich-toast-avatar" src="${avatar || ''}" alt="" />
+      <div class="rich-toast-text">
+        <div class="rich-toast-title">${escapeHtml(title)}</div>
+        <div class="rich-toast-body">${escapeHtml(truncatedBody)}</div>
+      </div>
+      <button class="rich-toast-close" aria-label="Đóng">✕</button>
+    </div>
+  `;
+
+  toast.querySelector('.rich-toast-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 300);
+  });
+
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.classList.add('removing');
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, 5000);
+}
+
+// ═══════════════════════════════════════════
+// Browser Notification API
+// ═══════════════════════════════════════════
+
+function checkNotificationPermission() {
+  if (!('Notification' in window)) return;
+
+  notificationPermission = Notification.permission;
+
+  if (notificationPermission === 'default' && notifPermissionBar) {
+    notifPermissionBar.classList.add('show');
+  }
+}
+
+if (notifAllowBtn) {
+  notifAllowBtn.addEventListener('click', async () => {
+    try {
+      const result = await Notification.requestPermission();
+      notificationPermission = result;
+    } catch {
+      Notification.requestPermission((result) => {
+        notificationPermission = result;
+      });
+    }
+    notifPermissionBar.classList.remove('show');
+  });
+}
+
+if (notifDismissBtn) {
+  notifDismissBtn.addEventListener('click', () => {
+    notifPermissionBar.classList.remove('show');
+  });
+}
+
+function sendBrowserNotification(title, options = {}) {
+  if (!('Notification' in window)) return;
+  if (notificationPermission !== 'granted') return;
+  if (isTabFocused) return;
+
+  try {
+    const notif = new Notification(title, {
+      body: options.body || '',
+      icon: options.icon || '',
+      tag: options.tag || 'chatbox-user',
+      requireInteraction: false,
+      silent: true,
+    });
+
+    notif.onclick = () => {
+      window.focus();
+      notif.close();
+    };
+
+    setTimeout(() => notif.close(), 8000);
+  } catch {
+    // Notification constructor may fail
+  }
+}
+
+// ═══════════════════════════════════════════
+// Tab Title Flash & Unread Badge
+// ═══════════════════════════════════════════
+
+function startTitleFlash() {
+  if (isTabFocused) return;
+  if (titleFlashInterval) return;
+
+  let showAlert = true;
+  titleFlashInterval = setInterval(() => {
+    if (showAlert && unreadCount > 0) {
+      document.title = `🔔 (${unreadCount}) Phản hồi mới!`;
+    } else {
+      document.title = ORIGINAL_TITLE;
+    }
+    showAlert = !showAlert;
+  }, 1000);
+}
+
+function stopTitleFlash() {
+  if (titleFlashInterval) {
+    clearInterval(titleFlashInterval);
+    titleFlashInterval = null;
+    document.title = ORIGINAL_TITLE;
+  }
+}
+
+function updateUnreadBadge() {
+  if (unreadBadge) {
+    unreadBadge.textContent = unreadCount;
+    unreadBadge.classList.toggle('hidden', unreadCount === 0);
+  }
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -427,16 +616,30 @@ function formatFileSize(bytes) {
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-    gain.gain.value = 0.1;
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.3);
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+    masterGain.gain.value = 0.15;
+
+    // Pleasant 2-tone chime: G5 → C6
+    const notes = [783.99, 1046.50];
+    const duration = 0.12;
+    const gap = 0.1;
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+
+      const startTime = ctx.currentTime + i * (duration + gap);
+      gain.gain.setValueAtTime(0.3, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration + 0.08);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.12);
+    });
   } catch {
     // Audio not supported
   }

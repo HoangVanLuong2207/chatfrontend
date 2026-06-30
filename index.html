@@ -51,6 +51,7 @@
         </div>
       </div>
       <button class="btn-icon" id="logout-btn" title="Đăng xuất">🚪</button>
+      <span class="unread-header-badge hidden" id="unread-badge">0</span>
     </div>
 
     <!-- Messages -->
@@ -105,6 +106,18 @@
   <div class="lightbox" id="lightbox">
     <button class="lightbox-close">✕</button>
     <img id="lightbox-img" src="" alt="Full size" />
+  </div>
+
+  <!-- Notification Permission Bar -->
+  <div class="notif-permission-bar" id="notif-permission-bar">
+    <div class="notif-permission-content">
+      <span class="notif-permission-icon">🔔</span>
+      <span class="notif-permission-text">Bật thông báo để không bỏ lỡ phản hồi từ đội ngũ hỗ trợ</span>
+      <div class="notif-permission-actions">
+        <button class="notif-allow-btn" id="notif-allow-btn">Cho phép</button>
+        <button class="notif-dismiss-btn" id="notif-dismiss-btn">Để sau</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Container -->

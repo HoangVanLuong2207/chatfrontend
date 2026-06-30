@@ -1,0 +1,17 @@
+{
+  "name": "chatbox-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ChatBox Frontend - Realtime chat UI",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "pusher-js": "^8.4.0"
+  }
+}

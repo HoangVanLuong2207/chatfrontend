@@ -819,32 +819,271 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════
-   Responsive
+   Mobile Viewport Fix
+   ═══════════════════════════════════════════ */
+
+/* Use dvh (dynamic viewport height) to handle mobile browser chrome */
+html, body {
+  height: 100dvh;
+  height: 100vh; /* fallback */
+}
+
+@supports (height: 100dvh) {
+  html, body {
+    height: 100dvh;
+  }
+}
+
+#welcome-screen {
+  height: 100dvh;
+  height: 100vh; /* fallback */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+@supports (height: 100dvh) {
+  #welcome-screen {
+    height: 100dvh;
+  }
+}
+
+#chat-screen {
+  height: 100dvh;
+  height: 100vh; /* fallback */
+}
+
+@supports (height: 100dvh) {
+  #chat-screen {
+    height: 100dvh;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Responsive — Mobile
    ═══════════════════════════════════════════ */
 
 @media (max-width: 640px) {
   .welcome-card {
     margin: 16px;
     padding: 32px 24px;
+    max-width: 100%;
   }
 
+  .welcome-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 28px;
+    margin-bottom: 20px;
+  }
+
+  .welcome-card h1 {
+    font-size: 24px;
+  }
+
+  .welcome-card p {
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  /* Header — compact on mobile */
   .chat-header {
-    padding: 12px 16px;
+    padding: 10px 12px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 
+  .header-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .header-info h2 {
+    font-size: 14px;
+  }
+
+  .header-status {
+    font-size: 11px;
+  }
+
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  /* Messages area */
   .chat-messages {
-    padding: 16px;
-  }
-
-  .chat-input-area {
-    padding: 12px 16px;
+    padding: 12px;
+    gap: 2px;
   }
 
   .message-wrapper {
-    max-width: 85%;
+    max-width: 88%;
+  }
+
+  .message-bubble {
+    padding: 8px 12px;
+    font-size: 14px;
   }
 
   .message-bubble img {
-    max-width: 220px;
+    max-width: 200px;
+    max-height: 240px;
+  }
+
+  .message-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .message-time {
+    font-size: 10px;
+  }
+
+  .message-sender-name {
+    font-size: 11px;
+  }
+
+  .chat-empty-icon {
+    font-size: 36px;
+  }
+
+  .chat-empty p {
+    font-size: 13px;
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* ═══════ Input Area — CRITICAL for mobile ═══════ */
+  .chat-input-area {
+    padding: 8px 10px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  .input-row {
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  .input-actions button {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #message-input {
+    padding: 9px 12px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    min-height: 38px;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-send {
+    width: 38px;
+    height: 38px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .btn-send svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Image preview compact */
+  .image-preview-bar {
+    margin-bottom: 8px;
+    padding: 6px;
+  }
+
+  .image-preview-bar img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .image-preview-info {
+    font-size: 12px;
+  }
+
+  .image-preview-remove {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  /* Toast — center on mobile */
+  .toast-container {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+  }
+
+  .toast {
+    max-width: 100%;
+    font-size: 12px;
+    padding: 10px 16px;
+  }
+
+  /* Lightbox mobile */
+  .lightbox img {
+    max-width: 95vw;
+    max-height: 80vh;
+  }
+
+  .lightbox-close {
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}
+
+/* ═══════ Very small screens (iPhone SE etc.) ═══════ */
+@media (max-width: 375px) {
+  .welcome-card {
+    margin: 8px;
+    padding: 24px 16px;
+  }
+
+  .welcome-card h1 {
+    font-size: 20px;
+  }
+
+  .chat-header {
+    padding: 8px 10px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+  }
+
+  .chat-messages {
+    padding: 8px;
+  }
+
+  .chat-input-area {
+    padding: 6px 8px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  .message-wrapper {
+    max-width: 92%;
+  }
+
+  .message-bubble img {
+    max-width: 170px;
   }
 }

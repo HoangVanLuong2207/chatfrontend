@@ -11,6 +11,9 @@ import {
   sendMessage,
   sendImage,
   getPusherConfig,
+  getVapidKey,
+  subscribePush,
+  unsubscribePush,
 } from './api.js';
 
 // ═══════════════════════════════════════════
@@ -30,6 +33,7 @@ const ORIGINAL_TITLE = document.title;
 let titleFlashInterval = null;
 let isTabFocused = true;
 let notificationPermission = Notification?.permission || 'denied';
+let swRegistration = null; // Service Worker registration
 
 // ═══════════════════════════════════════════
 // DOM
@@ -125,7 +129,20 @@ loginForm.addEventListener('submit', async (e) => {
   }
 });
 
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', async () => {
+  // Unsubscribe from web push
+  if (swRegistration) {
+    try {
+      const subscription = await swRegistration.pushManager.getSubscription();
+      if (subscription) {
+        await unsubscribePush(subscription.endpoint);
+        await subscription.unsubscribe();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   if (pusherClient) pusherClient.disconnect();
   clearToken();
   currentAdmin = null;
@@ -133,6 +150,7 @@ logoutBtn.addEventListener('click', () => {
   conversations = [];
   subscribedChannels = {};
   unreadCounts = {};
+  swRegistration = null;
 
   dashboard.classList.remove('active');
   loginScreen.style.display = 'flex';
@@ -149,6 +167,7 @@ async function enterDashboard() {
   await loadConversations();
   await setupPusher();
   checkNotificationPermission();
+  await setupWebPush();
 }
 
 async function loadConversations() {
@@ -764,6 +783,78 @@ function sendBrowserNotification(title, options = {}) {
   } catch {
     // Notification constructor may fail in some contexts
   }
+}
+
+// ═══════════════════════════════════════════
+// Web Push — Service Worker + Push Subscription
+// ═══════════════════════════════════════════
+
+async function setupWebPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('Web Push not supported in this browser');
+    return;
+  }
+
+  try {
+    // 1. Register service worker
+    swRegistration = await navigator.serviceWorker.register('/sw.js');
+    console.log('✅ Service Worker registered');
+
+    // 2. Get VAPID public key from backend
+    let vapidPublicKey;
+    try {
+      vapidPublicKey = await getVapidKey();
+    } catch (err) {
+      console.warn('Web Push not configured on server:', err.message);
+      return;
+    }
+
+    // 3. Check if already subscribed
+    let subscription = await swRegistration.pushManager.getSubscription();
+
+    if (!subscription) {
+      // 4. Subscribe to push notifications
+      // Need notification permission first
+      if (Notification.permission === 'default') {
+        const result = await Notification.requestPermission();
+        notificationPermission = result;
+        if (result !== 'granted') {
+          console.log('Notification permission denied, skipping web push');
+          return;
+        }
+      } else if (Notification.permission === 'denied') {
+        console.log('Notifications blocked, cannot setup web push');
+        return;
+      }
+
+      subscription = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+
+      console.log('✅ Push subscription created');
+    }
+
+    // 5. Send subscription to backend
+    await subscribePush(subscription.toJSON());
+    console.log('✅ Push subscription saved to server');
+  } catch (err) {
+    console.error('Web Push setup error:', err);
+  }
+}
+
+/**
+ * Convert a base64 URL-encoded string to Uint8Array (needed for applicationServerKey)
+ */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
 
 // ═══════════════════════════════════════════

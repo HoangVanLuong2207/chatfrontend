@@ -131,4 +131,26 @@ export async function getPusherConfig() {
   return res;
 }
 
+// Web Push
+export async function getVapidKey() {
+  const res = await request('/api/push/vapid-key');
+  return res.data.publicKey;
+}
+
+export async function subscribePush(subscription) {
+  const res = await request('/api/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ subscription }),
+  });
+  return res;
+}
+
+export async function unsubscribePush(endpoint) {
+  const res = await request('/api/push/unsubscribe', {
+    method: 'DELETE',
+    body: JSON.stringify({ endpoint }),
+  });
+  return res;
+}
+
 export { getToken, setToken, clearToken, getUser, setUser, API_URL };

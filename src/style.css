@@ -963,7 +963,7 @@ html, body {
   /* ═══════ Input Area — CRITICAL for mobile ═══════ */
   .chat-input-area {
     padding: 8px 10px;
-    padding-bottom: calc(50px + env(safe-area-inset-bottom));
+    padding-bottom: calc(30px + env(safe-area-inset-bottom));
     position: sticky;
     bottom: 0;
     z-index: 10;
@@ -1076,7 +1076,7 @@ html, body {
 
   .chat-input-area {
     padding: 6px 8px;
-    padding-bottom: calc(50px + env(safe-area-inset-bottom));
+    padding-bottom: calc(30px + env(safe-area-inset-bottom));
   }
 
   .message-wrapper {

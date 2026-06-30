@@ -849,6 +849,208 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════
+   Rich Toast Notifications
+   ═══════════════════════════════════════════ */
+
+.rich-toast {
+  padding: 0;
+  overflow: hidden;
+  min-width: 320px;
+  max-width: 400px;
+  transition: transform var(--transition), opacity var(--transition);
+}
+
+.rich-toast:hover {
+  transform: translateX(-4px);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+}
+
+.rich-toast.message {
+  border-left: 3px solid var(--accent-secondary);
+}
+
+.rich-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.rich-toast-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 2px solid var(--border-accent);
+}
+
+.rich-toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.rich-toast-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.rich-toast-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.rich-toast-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.rich-toast-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════
+   Notification Permission Bar
+   ═══════════════════════════════════════════ */
+
+.notif-permission-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1200;
+  transform: translateY(-100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notif-permission-bar.show {
+  transform: translateY(0);
+}
+
+.notif-permission-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(139, 92, 246, 0.95));
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+}
+
+.notif-permission-icon {
+  font-size: 22px;
+  animation: bellRing 2s ease-in-out infinite;
+}
+
+@keyframes bellRing {
+  0%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(12deg); }
+  20% { transform: rotate(-12deg); }
+  30% { transform: rotate(8deg); }
+  40% { transform: rotate(-8deg); }
+  50% { transform: rotate(0deg); }
+}
+
+.notif-permission-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+}
+
+.notif-permission-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.notif-allow-btn {
+  padding: 8px 20px;
+  background: white;
+  color: var(--accent-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.notif-allow-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.notif-dismiss-btn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.notif-dismiss-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ═══════════════════════════════════════════
+   Total Unread Badge (sidebar header)
+   ═══════════════════════════════════════════ */
+
+.total-unread-badge {
+  background: var(--danger);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+.total-unread-badge.hidden {
+  display: none;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Unread badge pulse on conversation items */
+.conversation-item .unread-badge {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════ */
 
@@ -865,5 +1067,26 @@ html, body {
 
   .chat-panel {
     width: 100%;
+  }
+
+  .notif-permission-content {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .notif-permission-text {
+    font-size: 12px;
+    flex-basis: calc(100% - 40px);
+  }
+
+  .notif-permission-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .rich-toast {
+    min-width: 280px;
+    max-width: 340px;
   }
 }

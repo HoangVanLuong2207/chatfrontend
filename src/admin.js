@@ -25,6 +25,12 @@ let subscribedChannels = {};
 let selectedFile = null;
 let unreadCounts = {};
 
+// Notification state
+const ORIGINAL_TITLE = document.title;
+let titleFlashInterval = null;
+let isTabFocused = true;
+let notificationPermission = Notification?.permission || 'denied';
+
 // ═══════════════════════════════════════════
 // DOM
 // ═══════════════════════════════════════════
@@ -56,6 +62,10 @@ const closeConvBtn = document.getElementById('close-conv-btn');
 const lightbox = document.getElementById('lightbox');
 const lightboxImg = document.getElementById('lightbox-img');
 const toastContainer = document.getElementById('toast-container');
+const notifPermissionBar = document.getElementById('notif-permission-bar');
+const notifAllowBtn = document.getElementById('notif-allow-btn');
+const notifDismissBtn = document.getElementById('notif-dismiss-btn');
+const totalUnreadBadge = document.getElementById('total-unread-badge');
 
 // ═══════════════════════════════════════════
 // Init
@@ -64,6 +74,21 @@ const toastContainer = document.getElementById('toast-container');
 async function init() {
   const token = getToken();
   const user = getUser();
+
+  // Track tab focus for notification decisions
+  document.addEventListener('visibilitychange', () => {
+    isTabFocused = !document.hidden;
+    if (isTabFocused) {
+      stopTitleFlash();
+    }
+  });
+  window.addEventListener('focus', () => {
+    isTabFocused = true;
+    stopTitleFlash();
+  });
+  window.addEventListener('blur', () => {
+    isTabFocused = false;
+  });
 
   if (token && user && user.role === 'admin') {
     currentAdmin = user;
@@ -123,6 +148,7 @@ async function enterDashboard() {
 
   await loadConversations();
   await setupPusher();
+  checkNotificationPermission();
 }
 
 async function loadConversations() {
@@ -194,6 +220,7 @@ function renderConversationList(filter = '') {
 async function selectConversation(conv) {
   activeConversationId = conv.id;
   unreadCounts[conv.id] = 0;
+  updateTotalUnreadBadge();
 
   // Update sidebar active state
   conversationList.querySelectorAll('.conversation-item').forEach((el) => {
@@ -274,8 +301,28 @@ async function setupPusher() {
       }
 
       renderConversationList();
-      showToast(`${data.user.name} bắt đầu cuộc hội thoại mới`, 'info');
+
+      const userName = data.user.name || 'Khách';
+      const avatarUrl = data.user.avatar_url || `https://api.dicebear.com/9.x/thumbs/svg?seed=${userName}`;
+
+      // Rich toast notification
+      showRichToast({
+        title: 'Hội thoại mới',
+        body: `${userName} bắt đầu cuộc hội thoại mới`,
+        avatar: avatarUrl,
+        type: 'info',
+        onClick: () => selectConversation(newConv),
+      });
+
+      // Browser notification
+      sendBrowserNotification(`Hội thoại mới — ${userName}`, {
+        body: 'Bắt đầu cuộc hội thoại mới. Nhấn để trả lời.',
+        icon: avatarUrl,
+        tag: `new-conv-${newConv.id}`,
+      });
+
       playNotificationSound();
+      startTitleFlash();
     });
 
     adminChannel.bind('new-message', (data) => {
@@ -289,7 +336,29 @@ async function setupPusher() {
         // If not the active conversation, increment unread count
         if (data.conversation_id !== activeConversationId) {
           unreadCounts[data.conversation_id] = (unreadCounts[data.conversation_id] || 0) + 1;
+
+          const senderName = data.message.sender_name || conv.user_name || 'Khách';
+          const avatarUrl = data.message.sender_avatar || conv.user_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${senderName}`;
+          const msgPreview = data.message.type === 'image' ? '🖼️ Đã gửi một ảnh' : (data.message.content || '');
+
+          // Rich toast notification
+          showRichToast({
+            title: senderName,
+            body: msgPreview,
+            avatar: avatarUrl,
+            type: 'message',
+            onClick: () => selectConversation(conv),
+          });
+
+          // Browser notification
+          sendBrowserNotification(senderName, {
+            body: msgPreview,
+            icon: avatarUrl,
+            tag: `msg-${data.conversation_id}`,
+          });
+
           playNotificationSound();
+          startTitleFlash();
         }
 
         // Move conversation to top
@@ -300,6 +369,7 @@ async function setupPusher() {
         });
 
         renderConversationList();
+        updateTotalUnreadBadge();
       }
     });
 
@@ -586,6 +656,156 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+/**
+ * Rich toast with avatar, title, body, and click-to-navigate
+ */
+function showRichToast({ title, body, avatar, type = 'info', onClick }) {
+  const toast = document.createElement('div');
+  toast.className = `toast rich-toast ${type}`;
+  if (onClick) toast.style.cursor = 'pointer';
+
+  const truncatedBody = body && body.length > 80 ? body.substring(0, 80) + '…' : body;
+
+  toast.innerHTML = `
+    <div class="rich-toast-content">
+      <img class="rich-toast-avatar" src="${avatar || ''}" alt="" />
+      <div class="rich-toast-text">
+        <div class="rich-toast-title">${escapeHtml(title)}</div>
+        <div class="rich-toast-body">${escapeHtml(truncatedBody)}</div>
+      </div>
+      <button class="rich-toast-close" aria-label="Đóng">✕</button>
+    </div>
+  `;
+
+  // Close button
+  toast.querySelector('.rich-toast-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 300);
+  });
+
+  // Click to navigate
+  if (onClick) {
+    toast.addEventListener('click', () => {
+      onClick();
+      toast.classList.add('removing');
+      setTimeout(() => toast.remove(), 300);
+    });
+  }
+
+  toastContainer.appendChild(toast);
+
+  // Auto-remove after 6 seconds
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.classList.add('removing');
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, 6000);
+}
+
+// ═══════════════════════════════════════════
+// Browser Notification API
+// ═══════════════════════════════════════════
+
+function checkNotificationPermission() {
+  if (!('Notification' in window)) return;
+
+  notificationPermission = Notification.permission;
+
+  if (notificationPermission === 'default' && notifPermissionBar) {
+    // Show the permission request bar
+    notifPermissionBar.classList.add('show');
+  }
+}
+
+if (notifAllowBtn) {
+  notifAllowBtn.addEventListener('click', async () => {
+    try {
+      const result = await Notification.requestPermission();
+      notificationPermission = result;
+    } catch {
+      // Older browsers use callback
+      Notification.requestPermission((result) => {
+        notificationPermission = result;
+      });
+    }
+    notifPermissionBar.classList.remove('show');
+  });
+}
+
+if (notifDismissBtn) {
+  notifDismissBtn.addEventListener('click', () => {
+    notifPermissionBar.classList.remove('show');
+  });
+}
+
+function sendBrowserNotification(title, options = {}) {
+  if (!('Notification' in window)) return;
+  if (notificationPermission !== 'granted') return;
+  if (isTabFocused) return; // Don't show if user is already on the page
+
+  try {
+    const notif = new Notification(title, {
+      body: options.body || '',
+      icon: options.icon || '',
+      tag: options.tag || 'chatbox-admin',
+      requireInteraction: false,
+      silent: true, // We play our own sound
+    });
+
+    notif.onclick = () => {
+      window.focus();
+      notif.close();
+    };
+
+    // Auto-close after 8 seconds
+    setTimeout(() => notif.close(), 8000);
+  } catch {
+    // Notification constructor may fail in some contexts
+  }
+}
+
+// ═══════════════════════════════════════════
+// Tab Title Flash
+// ═══════════════════════════════════════════
+
+function startTitleFlash() {
+  if (isTabFocused) return;
+  if (titleFlashInterval) return; // Already flashing
+
+  let showAlert = true;
+  titleFlashInterval = setInterval(() => {
+    const totalUnread = getTotalUnread();
+    if (showAlert && totalUnread > 0) {
+      document.title = `🔔 (${totalUnread}) Tin nhắn mới!`;
+    } else {
+      document.title = ORIGINAL_TITLE;
+    }
+    showAlert = !showAlert;
+  }, 1000);
+}
+
+function stopTitleFlash() {
+  if (titleFlashInterval) {
+    clearInterval(titleFlashInterval);
+    titleFlashInterval = null;
+    document.title = ORIGINAL_TITLE;
+  }
+}
+
+function getTotalUnread() {
+  return Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
+}
+
+function updateTotalUnreadBadge() {
+  const total = getTotalUnread();
+  if (totalUnreadBadge) {
+    totalUnreadBadge.textContent = total;
+    totalUnreadBadge.classList.toggle('hidden', total === 0);
+  }
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -608,18 +828,32 @@ function formatFileSize(bytes) {
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 600;
-    osc.type = 'sine';
-    gain.gain.value = 0.1;
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+    masterGain.gain.value = 0.15;
+
+    // Pleasant 3-tone chime: C5 → E5 → G5
+    const notes = [523.25, 659.25, 783.99];
+    const duration = 0.15;
+    const gap = 0.12;
+
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+
+      const startTime = ctx.currentTime + i * (duration + gap);
+      gain.gain.setValueAtTime(0.3, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration + 0.1);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.15);
+    });
   } catch {
-    // ignore
+    // Audio not supported
   }
 }
 

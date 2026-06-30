@@ -39,6 +39,7 @@
         <h2>
           💬 Hội thoại
           <span class="admin-badge">Admin</span>
+          <span class="total-unread-badge hidden" id="total-unread-badge">0</span>
         </h2>
         <div class="sidebar-actions">
           <button class="btn-sidebar" id="refresh-btn" title="Làm mới">🔄</button>
@@ -123,6 +124,18 @@
   <div class="lightbox" id="lightbox">
     <button class="lightbox-close">✕</button>
     <img id="lightbox-img" src="" alt="Full size" />
+  </div>
+
+  <!-- Notification Permission Bar -->
+  <div class="notif-permission-bar" id="notif-permission-bar">
+    <div class="notif-permission-content">
+      <span class="notif-permission-icon">🔔</span>
+      <span class="notif-permission-text">Bật thông báo để nhận tin nhắn từ khách hàng ngay cả khi bạn đang ở tab khác</span>
+      <div class="notif-permission-actions">
+        <button class="notif-allow-btn" id="notif-allow-btn">Cho phép</button>
+        <button class="notif-dismiss-btn" id="notif-dismiss-btn">Để sau</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast -->
